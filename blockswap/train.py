@@ -11,7 +11,7 @@ import pandas as pd
 os.mkdir('checkpoints/') if not os.path.isdir('checkpoints/') else None
 
 parser = argparse.ArgumentParser(description='Student/teacher training')
-parser.add_argument('--data_loc', default='/datasets/cifar', type=str,
+parser.add_argument('--data_loc', default='~/datasets/cifar', type=str,
                     help='folder containing cifar train and val folders')
 parser.add_argument('--workers', default=4, type=int, help='No. of data loading workers. Make this high for imagenet')
 parser.add_argument('--print_freq', default=10, type=int)
