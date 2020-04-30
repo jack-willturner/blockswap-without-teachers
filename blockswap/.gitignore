@@ -1,0 +1,7 @@
+*.ipynb
+__pycache__/
+models/__pycache__/
+genotypes/tempdir/
+checkpoints/
+.ipynb_checkpoints/
+*.pyc
