@@ -5,19 +5,22 @@ import argparse
 from tqdm import tqdm
 import time
 from utils import *
+import numpy as np
+import random
 
 import pandas as pd
 
 os.mkdir('checkpoints/') if not os.path.isdir('checkpoints/') else None
 
 parser = argparse.ArgumentParser(description='Student/teacher training')
-parser.add_argument('--data_loc', default='~/datasets/cifar', type=str,
+parser.add_argument('--data_loc', default='/home/s1788120/datasets/cifar10', type=str,
                     help='folder containing cifar train and val folders')
 parser.add_argument('--workers', default=4, type=int, help='No. of data loading workers. Make this high for imagenet')
 parser.add_argument('--print_freq', default=10, type=int)
 parser.add_argument('--GPU', default='0', type=str, help='GPU to use')
 parser.add_argument('--checkpoint', '-s', default='wrn_40_2_', type=str,
                     help='checkpoint to save/load student')
+parser.add_argument('--seed', default=1, type=int)
 
 # network stuff
 parser.add_argument('--wrn_depth', default=40, type=int, help='depth for WRN')
@@ -45,6 +48,12 @@ import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+random.seed(args.seed)
+np.random.seed(args.seed)
+torch.manual_seed(args.seed)
 
 def train(net):
     batch_time = AverageMeter()
@@ -186,9 +195,9 @@ if __name__ == '__main__':
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
     trainset = torchvision.datasets.CIFAR10(root=args.data_loc,
-                                            train=True, download=False, transform=transform_train)
+                                            train=True, download=True, transform=transform_train)
     valset = torchvision.datasets.CIFAR10(root=args.data_loc,
-                                          train=False, download=False, transform=transform_validate)
+                                          train=False, download=True, transform=transform_validate)
 
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True,
                                               num_workers=args.workers,

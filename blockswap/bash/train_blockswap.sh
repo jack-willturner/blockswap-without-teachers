@@ -3,8 +3,8 @@
 #SBATCH --requeue
 #SBATCH --output=logs/blockswap1.out
 #SBATCH --job-name=blockswap
-#SBATCH --gres=gpu:1
-#SBATCH --mem=14000
+#SBATCH --gres=gpu:4
+#SBATCH --mem=56000
 #SBATCH --time=10000
 
 export PATH="$HOME/miniconda/bin:$PATH"
