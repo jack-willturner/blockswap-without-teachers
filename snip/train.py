@@ -1,11 +1,6 @@
 '''Train base models to later be pruned'''
 from __future__ import print_function
 
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.optim.lr_scheduler as lr_scheduler
-
 import torchvision
 import torchvision.transforms as transforms
 
@@ -13,16 +8,20 @@ import os
 import json
 import argparse
 
+import numpy as np
+import random
+
 import time
 
 parser = argparse.ArgumentParser(description='PyTorch CIFAR10 Training')
 parser.add_argument('--model',      default='resnet18', help='resnet9/18/34/50, wrn_40_2/_16_2/_40_1')
 parser.add_argument('--data_loc',   default='/disk/scratch/datasets/cifar', type=str)
-parser.add_argument('--teacher_checkpoint', default='', type=str)
-parser.add_argument('--student_checkpoint', default='', type=str)
 
-parser.add_argument('--checkpoint', default='resnet18', type=str)
-parser.add_argument('--GPU', default='0,1', type=str,help='GPU to use')
+
+parser.add_argument('--seed', default=1, type=int)
+parser.add_argument('--num', default=1, type=int)
+
+parser.add_argument('--GPU', default='0', type=str,help='GPU to use')
 
 ### training specific args
 parser.add_argument('--epochs',     default=200, type=int)
@@ -38,16 +37,18 @@ from models import *
 from utils  import *
 from tqdm   import tqdm
 
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.optim.lr_scheduler as lr_scheduler
 
-def distillation(y, teacher_scores, labels, T, alpha):
-    return F.kl_div(F.log_softmax(y/T, dim=1), F.softmax(teacher_scores/T, dim=1)) * (T*T * 2. * alpha)\
-           + F.cross_entropy(y, labels) * (1. - alpha)
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-def at(x):
-    return F.normalize(x.pow(2).mean(1).view(x.size(0), -1))
-
-def at_loss(x, y):
-    return (at(x) - at(y)).pow(2).mean()
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+random.seed(args.seed)
+np.random.seed(args.seed)
+torch.manual_seed(args.seed)
 
 def accuracy(output, target, topk=(1,)):
     """Computes the precision@k for the specified values of k"""
@@ -78,9 +79,9 @@ def train(net, trainloader, criterion, optimizer):
     end = time.time()
 
     for batch_idx, (inputs, targets) in enumerate(trainloader):
-        inputs  = Variable(inputs.cuda())
-        targets = Variable(targets.cuda())
-        outs_, ints_ = net(inputs)
+        inputs  = inputs.cuda()
+        targets = targets.cuda()
+        outs_, _ = net(inputs)
 
         loss = criterion(outs_, targets)
 
@@ -157,20 +158,24 @@ global error_history
 model = WideResNet(40,2)
 model.to(device)
 
-model.load_state_dict(torch.load('checkpoints/%s.t7' % args.checkpoint))
+
+model.load_state_dict(torch.load('checkpoints/snip_mask_%d_%d.t7' % (args.seed, args.num)))
+
+## separate file to save trained weights to
+savefile = 'snip_net_%d_%d' % (args.seed, args.num)
 
 masks = []
-for name, w in student.named_parameters():
+for name, w in model.named_parameters():
     masks.append(w.detach().view(-1)) if 'mask' in name else None
 
 masks = torch.cat(masks)
 print(masks.sum())
 time.sleep(3)
 
-student = student.cuda()
+model= model.cuda()
 
-trainloader, testloader = get_cifar_loaders(args.data_loc)
-optimizer = optim.SGD([w for name, w in student.named_parameters() if not 'mask' in name], lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
+trainloader, testloader = get_cifar_loaders('~/datasets/cifar')
+optimizer = optim.SGD([w for name, w in model.named_parameters() if not 'mask' in name], lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
 scheduler = lr_scheduler.CosineAnnealingLR(optimizer,args.epochs, eta_min=1e-10)
 criterion = nn.CrossEntropyLoss()
 
@@ -181,6 +186,6 @@ val_errors   = []
 
 error_history = []
 for epoch in tqdm(range(args.epochs)):
-    train(net, trainloader, criterion, optimizer)
-    validate(net, epoch, testloader, criterion, checkpoint=args.checkpoint if epoch != 2 else args.checkpoint+'_init')
+    train(model, trainloader, criterion, optimizer)
+    validate(model, epoch, testloader, criterion, checkpoint=savefile)
     scheduler.step()

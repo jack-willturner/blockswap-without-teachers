@@ -5,9 +5,7 @@ import torch.optim.lr_scheduler as lr_scheduler
 budgets=[811.4, 556.0, 404.2, 289.2,217.0,162.2]
 import torchvision
 import torchvision.transforms as transforms
-no=5
 
-BUDGET = int(budgets[no]*1000)
 
 import os
 import json
@@ -16,6 +14,26 @@ from models import *
 from utils  import *
 from tqdm   import tqdm
 
+import numpy as np
+import random
+
+import argparse
+
+parser = argparse.ArgumentParser(description='PyTorch CIFAR10 Training')
+parser.add_argument('--num', default=0, type=int, help='which budget')
+parser.add_argument('--seed', default=1, type=int)
+args = parser.parse_args()
+
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+random.seed(args.seed)
+np.random.seed(args.seed)
+torch.manual_seed(args.seed)
+
+
+no=args.num
+
+BUDGET = int(budgets[no]*1000)
 
 model = WideResNet(40,2)
 
@@ -50,11 +68,11 @@ for name, w in model.named_parameters():
 masks = torch.cat(masks)
 masks.sum()
 
-torch.save(model.state_dict(),'checkpoints/snip_mask_%d.t7' % no)
+torch.save(model.state_dict(),'checkpoints/snip_mask_%d_%d.t7' % (args.seed, no))
 
 
 
-
+'''
 # test
 model = WideResNet(40,2)
 
@@ -100,3 +118,4 @@ model = WideResNet(40,2)
 
 model, _ = load_model(model,'wrn_40_2_1',old_format=True)
 validate(model,200,valloader=testloader,criterion=criterion)
+'''
